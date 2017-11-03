@@ -1,0 +1,67 @@
+<html lang="en-us">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>CEDANN NeuroDriver</title>
+
+	<script src="dom.js"></script>
+	<script src="num.js"></script>
+	<script src="gfx.js"></script>
+	<script src="game.js"></script>
+	<script src="neurobackup.js"></script>
+	<script src="neuronet.js"></script>
+	<script src="neuroclass.js"></script>
+	<script src="neurodriver.js"></script>
+</head>
+<body>
+
+<div>
+<table>
+<tr>
+<td><canvas id="gameCanvas" style="margin: 0; margin-bottom: 25px; border-width: 2px; border-style: solid; border-colour: #000;"></canvas></td>
+<td id="hud-score">0</td>
+</tr>
+</table>
+</div>
+<div><canvas id="driverCanvas" style="margin: 0; margin-bottom: 25px; border-width: 2px; border-style: solid; border-colour: #000;"></canvas></div>
+
+<script type="text/javascript">
+
+var game = null;
+var driver = null;
+
+function init()
+{
+	game = game_initiate("gameCanvas");
+	
+	var outputs = [
+		{ name: "Accelerate", activate: function() { game.keyPressed(game.KEY_CODES.UP); }, deactivate: function() { game.keyReleased(game.KEY_CODES.UP); } },
+		{ name: "Break", activate: function() { game.keyPressed(game.KEY_CODES.DOWN); }, deactivate: function() { game.keyReleased(game.KEY_CODES.DOWN); } },
+		{ name: "Left", activate: function() { game.keyPressed(game.KEY_CODES.LEFT); }, deactivate: function() { game.keyReleased(game.KEY_CODES.LEFT); } },
+		{ name: "Right", activate: function() { game.keyPressed(game.KEY_CODES.RIGHT); }, deactivate: function() { game.keyReleased(game.KEY_CODES.RIGHT); } }
+	];
+	
+	var getFitness = function() {
+	
+		var now = num.timestamp();
+		
+		var playerLapTime = 80000;
+		var targetLapTime = (playerLapTime / game.roadLength) * game.carPos;
+		var actualLapTime = now - game.lapStart;
+		
+		return -Math.floor(actualLapTime - targetLapTime);
+		
+	};
+	
+	var hasCompletedTask = function() { return game.complete; };
+	var hasStagnated = function() { return (driverFitness() <= -15000); };
+	
+	driver = neurodriver_initiate("driverCanvas", game.gfx);
+}
+
+document.addEventListener("DOMContentLoaded", init(), false);
+
+</script>
+
+</body>
+</html>
