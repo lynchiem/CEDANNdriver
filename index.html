@@ -33,29 +33,6 @@ var driver = null;
 function init()
 {
 	game = game_initiate("gameCanvas");
-	
-	var outputs = [
-		{ name: "Accelerate", activate: function() { game.keyPressed(game.KEY_CODES.UP); }, deactivate: function() { game.keyReleased(game.KEY_CODES.UP); } },
-		{ name: "Break", activate: function() { game.keyPressed(game.KEY_CODES.DOWN); }, deactivate: function() { game.keyReleased(game.KEY_CODES.DOWN); } },
-		{ name: "Left", activate: function() { game.keyPressed(game.KEY_CODES.LEFT); }, deactivate: function() { game.keyReleased(game.KEY_CODES.LEFT); } },
-		{ name: "Right", activate: function() { game.keyPressed(game.KEY_CODES.RIGHT); }, deactivate: function() { game.keyReleased(game.KEY_CODES.RIGHT); } }
-	];
-	
-	var getFitness = function() {
-	
-		var now = num.timestamp();
-		
-		var playerLapTime = 80000;
-		var targetLapTime = (playerLapTime / game.roadLength) * game.carPos;
-		var actualLapTime = now - game.lapStart;
-		
-		return -Math.floor(actualLapTime - targetLapTime);
-		
-	};
-	
-	var hasCompletedTask = function() { return game.complete; };
-	var hasStagnated = function() { return (driverFitness() <= -15000); };
-	
 	driver = neurodriver_initiate("driverCanvas", game.gfx);
 }
 
