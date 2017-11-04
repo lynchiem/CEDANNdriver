@@ -2,8 +2,10 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>CEDANN NeuroDriver</title>
+	<title>CEDANN: Driver</title>
 
+	<link rel="stylesheet" type="text/css" href="layout.css"/>
+	
 	<script src="dom.js"></script>
 	<script src="num.js"></script>
 	<script src="gfx.js"></script>
@@ -14,16 +16,20 @@
 	<script src="neurodriver.js"></script>
 </head>
 <body>
-
-<div>
-<table>
-<tr>
-<td><canvas id="gameCanvas" style="margin: 0; margin-bottom: 25px; border-width: 2px; border-style: solid; border-colour: #000;"></canvas></td>
-<td id="hud-score">0</td>
-</tr>
-</table>
+<div class="main-header">Classified Evolution of Directed Acyclic Neural Networks (CEDANN)</div>
+<div class="sub-header">Neuro-Evolved Game Driver with Evolved RGB Sensors</div>
+<div class="main-display">
+	<div class="game"><canvas id="gameCanvas"></canvas></div>
+	<div class="stats">
+		<table>
+			<tr>
+				<td class="label">Current Score:</td>
+				<td class="value" id="hud-score">0</td>
+			</tr>
+		</table>
+	</div>
 </div>
-<div><canvas id="driverCanvas" style="margin: 0; margin-bottom: 25px; border-width: 2px; border-style: solid; border-colour: #000;"></canvas></div>
+<div class="details-display"><canvas id="driverCanvas"></canvas></div>
 
 <script type="text/javascript">
 

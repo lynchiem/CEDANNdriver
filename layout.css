@@ -1,0 +1,91 @@
+BODY
+{
+	margin: 0;
+	background-color: #EAEAEA;
+	font-family: "Source Sans Pro", Arial, sans-serif;
+}
+
+DIV.main-header
+{
+	color: #FFFFFF;
+	background-color: #33363B;
+	
+	font-size: 16px;
+	font-weight: bold;
+	
+	padding: 10px;
+}
+
+DIV.sub-header
+{
+	color: #FFFFFF;
+	background-color: #3B8DBD;
+	
+	font-size: 16px;
+	font-family: "Source Sans Pro", Arial, sans-serif;
+	font-weight: bold;
+	
+	
+	padding: 10px;
+}
+
+DIV.main-display
+{
+	padding: 10px;
+}
+
+DIV.main-display DIV.game
+{
+	float: left;
+	width: 400px;
+}
+
+DIV.main-display DIV.stats
+{
+	background-color: #FFFFFF;
+	padding: 10px;
+	margin-left: 400px;
+	font-size: 12px;
+	font-weight: normal;
+	height: 280px;
+}
+
+DIV.main-display DIV.stats TABLE
+{
+	border-style: solid;
+	border-width: 1px;
+	border-collapse: collapse;
+	border-color: #000000;
+}
+
+DIV.main-display DIV.stats TABLE TD
+{
+	border-style: solid;
+	border-width: 1px;
+	border-collapse: collapse;
+	border-color: #000000;
+	
+	padding: 5px;
+}
+
+DIV.main-display DIV.stats TABLE TD.label
+{
+	width: 120px;
+	font-weight: bold;
+	text-align: left;
+}
+
+DIV.main-display DIV.stats TABLE TD.value
+{
+	width: 120px;
+	font-weight: normal;
+	text-align: right;
+}
+
+DIV.details-display
+{
+	padding: 10px;
+	padding-bottom: 25px;
+	clear: both;
+	background-color: #33363B;
+}
