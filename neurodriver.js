@@ -327,94 +327,93 @@ function neurodriver_newGeneration()
 	}
 }
 
-function neurodriver_sample()
+function neurodriver_getEvaluationNetwork(terminateCurrent)
 {
 	var self = this;
-	
+
+	var classification = self.classifications[self.currentClassificationIndex];	
 	var network = self.evaluationNetwork;
 	
-	var done = false;
+	// Move on if a request has been made to terminate evaluation
+	// of the current network.
+	if(network != null && terminateCurrent)
+		network = null;
 	
+	// Move on if the current network has no axions.
+	if(network != null && network.axions == 0)
+		network = null;
+	
+	if(network == null && classification != null)
+		network = classification.nextNetwork();
+	
+	// If there are no more networks in current classification,
+	// move on to the next classification.
 	if(network == null)
-		done = true;
-	
-	if(network != null && network.axions.length == 0)
-		done = true;
-
-	if(game.complete)
-		done = true;
-	
-	var fitness = self.calculateFitness();
-	
-	if(game.carPos <= self.evaluation.lastSampleDistance && fitness < -500)
-		done = true;
-	
-	if(game.carPos > self.evaluation.lastSampleDistance && fitness < -5000)
-		done = true;
-	
-	if(done)
 	{
-		if(network != null)
-			network.fitness = (self.evaluation.lastSampleDistance * 1000) + self.evaluation.lastSampleFitness;
+		self.currentClassificationIndex += (self.currentClassificationIndex + 1	< self.classifications.length)? 1 : 0;
+		
+		classification = self.classifications[self.currentClassificationIndex];
+		
+		if(classification != null)
+			network = classification.nextNetwork();
+	}
+	
+	// No classified networks available? See if there are any unclassified networks in classification backlog.
+	if(network == null)
+	{
+		for(var i = 0; i < self.classificationBacklog.length; i++)
+		{
+			if(self.classificationBacklog[i].fitness == null)
+			{
+				network = self.classificationBacklog[i];
+				
+				break;
+			}
+		}
+	}
+	
+	// Still no network? Time for a new generation!
+	if(network == null)
+	{
+		self.newGeneration();
 		
 		var classification = self.classifications[self.currentClassificationIndex];
 		
 		if(classification != null)
 			network = classification.nextNetwork();
-		
-		if(network == null)
-		{
-			self.currentClassificationIndex += (self.currentClassificationIndex + 1	< self.classifications.length)? 1 : 0;
-			
-			var classification = self.classifications[self.currentClassificationIndex];
-			
-			if(classification != null)
-				network = classification.nextNetwork();
-		}
-		
-		// If there are no more classified networks to evaluate in this generation,
-		// then we should see if there are any networks awaiting evaluation in the
-		// classification backlog.
-		if(network == null)
-		{
-			for(var i = 0; i < self.classificationBacklog.length; i++)
-			{
-				if(self.classificationBacklog[i].fitness == null)
-				{
-					network = self.classificationBacklog[i];
-				}
-			}
-		}
-		
-		// If there are no more classified networks to evaluate in this generation,
-		// and there are no networks waiting evaluation in the classification backlog,
-		// then it is time to start a new generation.
-		if(network == null)
-		{
-			self.newGeneration();
-			
-			var classification = self.classifications[self.currentClassificationIndex];
-			
-			if(classification != null)
-				network = classification.nextNetwork();
-		}
-		
-		self.evaluationNetwork = network;
-		
+	}
+	
+	self.evaluationNetwork = network;
+	return network;
+}
+
+function neurodriver_sample()
+{
+	var self = this;
+	
+	var fitness = self.calculateFitness();
+	var terminateCurrent = false;
+	
+	if(game.complete)
+		terminateCurrent = true;
+	
+	if(game.carPos <= self.evaluation.lastSampleDistance && fitness < -500)
+		terminateCurrent = true;
+	
+	if(game.carPos > self.evaluation.lastSampleDistance && fitness < -5000)
+		terminateCurrent = true;
+	
+	if(terminateCurrent)
+	{
 		self.evaluation.lastSampleFitness = 0;
 		self.evaluation.lastSampleDistance = 0;
 		
 		game.reset();
 	}
 	
-	if(network == null)
-	{
-		alert("out of networks");
-		
-		return;
-	}
+	var network = self.getEvaluationNetwork(terminateCurrent);
 	
-	dom.set("hud-score", fitness);
+	dom.set("hud-score", fitness.toLocaleString());
 	
 	self.evaluation.lastSampleFitness = fitness;
 	self.evaluation.lastSampleDistance = game.carPos;
@@ -730,6 +729,7 @@ function neurodriver_initiate(displayCanvasId, gfxIn)
 	spawn.reclassifyNetworks = neurodriver_reclassifyNetworks;
 	spawn.calculateFitness = neurodriver_calculateFitness;
 	spawn.sample = neurodriver_sample;
+	spawn.getEvaluationNetwork = neurodriver_getEvaluationNetwork;
 	spawn.updatedRGBSensors = neurodriver_updatedRGBSensors;
 	
 	spawn.receiveAnimationFrame = neurodriver_receiveAnimationFrame;
