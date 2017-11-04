@@ -526,7 +526,7 @@ function neuronet_spawnNeuron(generation)
 	// 
 	// The reason we need to do this is that we can only propagate forward,
 	// and we need to maintain the integrity of the network.
-	var intersectLayer = inputNeuron.layer + 1;
+	var intersectLayer = num.limit(inputNeuron.layer + 1, self.LIMITS.MAX_SENSORS, self.SPECIAL_LAYERS.ACTUATORS - 1);
 	
 	for(var i = 0; i < self.neurons.length; i++)
 	{
