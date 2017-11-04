@@ -10,7 +10,7 @@ function neuroclass_newGeneration(generation, maxPopulation)
 	var totalFitness = 0;
 	
 	for(var i = 0; i < self.networks.length; i++)
-		totalFitness += (self.networks[i].fitness != null)? self.networks[i].fitness : -12500;
+		totalFitness += (self.networks[i].fitness != null)? self.networks[i].fitness : self.minFitness;
 	
 	var averageFitness = totalFitness / self.networks.length;
 	
@@ -136,6 +136,8 @@ function neuroclass_nextNetwork()
 function neuroclass_initiate(referenceNetwork, createNetworkHook)
 {
 	var spawn = {};
+	
+	spawn.minFitness = -12500;
 	
 	spawn.averageFitness = 0;
 	spawn.mutationMultiplier = 1;
