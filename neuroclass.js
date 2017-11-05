@@ -3,7 +3,7 @@
 // AUTHOR: 	matt@matthewlynch.net
 // DATED: 	2017-11-02
 
-function neuroclass_newGeneration(generation, maxPopulation)
+function neuroclass_updateAverageFitness()
 {
 	var self = this;
 	
@@ -20,6 +20,23 @@ function neuroclass_newGeneration(generation, maxPopulation)
 		self.mutationMultiplier = 1;
 	
 	self.averageFitness = averageFitness;
+}
+
+function neuroclass_getFittestNetwork()
+{
+	var self = this;
+	
+	var sortedNetworks = self.networks.sort(function(a, b) { return b.fitness - a.fitness; });
+	
+	if(sortedNetworks.length > 0)
+		return sortedNetworks[0];
+	else
+		return null;
+}
+
+function neuroclass_newGeneration(generation)
+{
+	var self = this;
 	
 	// Reset the next network pointer.
 	self.nextNetworkIndex = 0;
@@ -28,93 +45,139 @@ function neuroclass_newGeneration(generation, maxPopulation)
 	if(self.networks.length == 0)
 		return;
 	
-	var newNetworks = [];
+	var survivors = [];
+	var outcasts = [];
+	var descendants = [];
 	
-	// Before we can create a new generation, we need to cull the existing
-	// generation and select a breeding pool. The first step in doing this
-	// is to sort the networks by fitness.
-	var breedingNetworks = self.networks.sort(function(a, b) { return b.fitness - a.fitness; });
+	survivors = self.networks.sort(function(a, b) { return b.fitness - a.fitness; });
 	
-	// Next we cull the weakest half of the existing population (which we
-	// only do if there are more than two networks in current generation).
-	var maxBreederIndex = Math.ceil(breedingNetworks.length / 2) - 1;
+	var strongestNetwork = survivors[0];
 	
-	breedingNetworks = (breedingNetworks.length > 2)? breedingNetworks.splice(0, maxBreederIndex) : breedingNetworks;
-	
-	// To make sure we don't go backwards, we copy the fittest network with
-	// no mutation of breeding.
-	var fittestNetwork = self.createNetwork();
-	breedingNetworks[0].clone(fittestNetwork);
-	
-	newNetworks.push(fittestNetwork);
-	
-	// We also make the fittest network the new reference for the classification.
-	// (In a speciated evolution the fittest network could be a new species, but
-	// for our classified evolution we always keep the fittest in place to ensure
-	// an existing classification doesn't go backwards).
-	self.referenceNetwork = fittestNetwork;
-	
-	// Stop if we have already reached population cap (the min. population is always
-	// one, even if the passed in population cap is lower).
-	if(newNetworks.length >= maxPopulation)
+	// While the strongest network always survives, other networks will only
+	// survive if they are compatible with the strongest.
+	for(var i = survivors.length - 1; i >= 1; i--)
 	{
-		self.networks = newNetworks;
+		var network = survivors[i];
 		
-		return;
+		if(strongestNetwork.isCompatible(network))
+			continue;
+		
+		// If the network is not compatible with the strongest network in the
+		// generation, it is outcast.
+		
+		// Add to list of outcasts.
+		outcasts.push(network);
+		
+		// Remove from list of survivors.
+		survivors.splice(i, 1);
 	}
 	
-	// Next we want to clone random healthy networks, with the possibility for mutations.
-	var clonePopulation = (maxPopulation - 1 * 0.25);
-	var maxCloneIndex = Math.ceil(breedingNetworks.length / 2) - 1;
+	// If there are more than 5 survivors (including the strongest), the weaker
+	// are allowed to produce up to 5 descendants, but they are immediately outcast.
+	if(survivors.length > 5)
+	{	
+		// Remove the wealkings from the list of survivors.
+		var weaklings = survivors.splice(5, survivors.length - 5);
+		
+		// Shuffle weaklings to decide who gets to breed if there are not an even
+		// number of weak networks.
+		for(var i = weaklings.length - 1; i > 0; i--)
+		{
+			var j = Math.floor(Math.random() * (i + 1));
+			var temp = weaklings[i];
+			
+			weaklings[i] = weaklings[j];
+			weaklings[j] = temp;
+		}
+		
+		var weakDescendants = [];
+		
+		for(var i = 0; i < weaklings.length; i++)
+		{
+			if(weakDescendants.length >= 5)
+				break;
+			
+			if(i + 1 < weaklings.length)
+			{
+				var childNetwork = self.createNetwork();
+				
+				weaklings[i].breed(weaklings[i + 1], childNetwork, generation);
+				
+				childNetwork.mutateNetwork(generation);
+				
+				weakDescendants.push(childNetwork);
+			}
+		}
+		
+		outcasts = outcasts.concat(weakDescendants);
+	}
 	
-	while(newNetworks.length < clonePopulation + 1)
+	// The strongest network gets two clones, one with mutation and one without.
+	var strongCloneA = self.createNetwork();
+	var strongCloneB = self.createNetwork();
+	
+	strongestNetwork.clone(strongCloneA);
+	strongestNetwork.clone(strongCloneB);
+	
+	strongCloneB.mutateNetwork(generation);
+	
+	descendants.push(strongCloneA);
+	descendants.push(strongCloneB);
+	
+	// Each of the survivors also gets a clone, with mutation.
+	for(var i = 1; i < survivors.length; i++)
 	{
-		var parentNetwork = breedingNetworks[num.randomInt(0, maxCloneIndex)];
+		var network = survivors[i];
 		var cloneNetwork = self.createNetwork();
 		
-		parentNetwork.clone(cloneNetwork);
+		network.clone(cloneNetwork)
 		
-		for(var i = 0; i < Math.floor(self.mutationMultiplier); i++)
-			cloneNetwork.mutateNetwork(generation);
+		cloneNetwork.mutateNetwork(generation);
 		
-		newNetworks.push(cloneNetwork);
+		descendants.push(network);
 	}
 	
-	// For the remainder, we will randomly select two networks and breed them.
-	while(newNetworks.length < maxPopulation)
+	// The rest of the descendants will be the result of the strongest network
+	// breeding with other survivors.
+	var clonePenalty = 0;
+	
+	while(descendants.length < 10)
 	{
-		var indexA = num.randomInt(0, breedingNetworks.length - 1);
-		var indexB = num.randomInt(0, breedingNetworks.length - 1);
-		
-		if(indexA == indexB)
+		if(survivors.length == 1)
 		{
-			// If we randomly selected the same network twice, we will just clone it,
-			// but we will run multiple mutation cycles.
-			//
-			// Consider it the neural network version of "kissing cousins".
-			var parentNetwork = breedingNetworks[indexA];
+			// If the strongest network is the only survivor, cloning can be used,
+			// but with a heavy mutation penalty.
 			var cloneNetwork = self.createNetwork();
-
-			parentNetwork.clone(cloneNetwork);
 			
-			for(var i = 0; i < (5 * Math.floor(self.mutationMultiplier)); i++)
+			strongestNetwork.clone(cloneNetwork)
+			
+			for(var i = 0; i < 5 + clonePenalty; i++)
 				cloneNetwork.mutateNetwork(generation);
 			
-			newNetworks.push(cloneNetwork);
+			descendants.push(cloneNetwork);
+			
+			clonePenalty += 1;
 		}
 		else
 		{
-			var parentNetworkA = breedingNetworks[indexA];
-			var parentNetworkB = breedingNetworks[indexB];
-			var childNetwork = self.createNetwork();
-			
-			parentNetworkA.breed(parentNetworkB, childNetwork, generation);
-			
-			newNetworks.push(childNetwork);
+			for(var i = 1; i < survivors.length; i++)
+			{
+				var network = survivors[i];
+				var childNetwork = self.createNetwork();
+				
+				strongestNetwork.breed(network, childNetwork, generation);
+				
+				childNetwork.mutateNetwork(generation);
+				
+				descendants.push(childNetwork);
+			}
 		}
 	}
 	
-	self.networks = newNetworks;
+	self.referenceNetwork = strongCloneA;
+	self.networks = descendants;
+	
+	return outcasts;
 }
 
 function neuroclass_nextNetwork()
@@ -149,9 +212,11 @@ function neuroclass_initiate(referenceNetwork, createNetworkHook)
 	
 	spawn.nextNetworkIndex = 0;
 	
+	spawn.updateAverageFitness = neuroclass_updateAverageFitness;
 	spawn.nextNetwork = neuroclass_nextNetwork;
 	spawn.createNetwork = createNetworkHook;
 	spawn.newGeneration = neuroclass_newGeneration;
+	spawn.getFittestNetwork = neuroclass_getFittestNetwork;
 	
 	return spawn;
 }

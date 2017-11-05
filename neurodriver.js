@@ -21,8 +21,8 @@ function neurodriver_determineClassification(network)
 		}
 	}
 	
-	if(!assigned)
-		self.classificationBacklog.push(network);
+	
+	return assigned;
 }
 
 function neurodriver_reclassifyNetworks()
@@ -39,7 +39,8 @@ function neurodriver_reclassifyNetworks()
 			
 			if(!classification.referenceNetwork.isCompatible(network))
 			{
-				self.determineClassification(network);
+				if(!self.determineClassification(network))
+					self.classificationBacklog.push(network);
 				
 				classification.networks.splice(j, 1);
 			}
@@ -57,11 +58,14 @@ function neurodriver_spawnClassification(referenceNetwork)
 	return classification;
 }
 
-function neurodriver_spawnNetwork()
+function neurodriver_spawnNetwork(originGeneration)
 {
 	var self = this;
 	
+	originGeneration = originGeneration || self.generation;
+	
 	var network = neuronet_initiate(
+		originGeneration,
 		function() { return self.newInnovation(); },
 		function() { return self.spawnRGBSensor(); },
 		function(sensor) { self.mutateRGBSensor(sensor); },
@@ -272,58 +276,139 @@ function neurodriver_calculateFitness()
 function neurodriver_newGeneration()
 {
 	var self = this;
-	
-	self.generation += 1;
 
+	// Find and preserve the fittest network.
+	var scoredNetworks = [];
+	
 	for(var i = 0; i < self.classifications.length; i++)
 	{
 		var classification = self.classifications[i];
 		
-		classification.newGeneration(self.generation, 50);
+		for(var j = 0; j < classification.networks.length; j++)
+		{
+			var network = classification.networks[j];
+			
+			if(network.fitness != null)
+				scoredNetworks.push(network);
+		}
 	}
 	
-	self.reclassifyNetworks();
+	scoredNetworks = scoredNetworks.sort(function(a, b) { return b.fitness - a.fitness; });
 	
-	// Manage backlog.
-	var unscoredBacklogNetworks = [];
-	var scoredBacklogNetworks = [];
+	if(scoredNetworks.length > 0 && scoredNetworks[0].fitness > 0)
+		self.fittestNetworks.push(scoredNetworks[0]);
+	
+	self.fittestNetworks = self.fittestNetworks.sort(function(a, b) { return b.fitness - a.fitness; });
+	
+	while(self.fittestNetworks.length > 10)
+		self.fittestNetworks.pop();
+	
+	if(self.fittestNetworks.length > 0)
+		self.maxFitness = self.fittestNetworks[0].fitness;
+	
+	
+	
+	
+	
+	// Update generation count and reset current classification pointer.
+	self.generation += 1;
+	self.currentClassificationIndex = 0;
+	
+	// If there are no classifications, create a random one to get the ball going.
+	if(self.classifications.length == 0)
+		self.spawnClassification(self.spawnNetwork());
+	
+	// Seperate & sort scored and unscored outcasts.
+	var unscoredOutcasts = [];
+	var scoredOutcasts = [];
 	
 	for(var i = 0; i < self.classificationBacklog.length; i++)
 	{
 		var network = self.classificationBacklog[i];
 		
 		if(network.fitness == null)
-			unscoredBacklogNetworks.push(network);
+			unscoredOutcasts.push(network);
 		else
-			scoredBacklogNetworks.push(network);
+			scoredOutcasts.push(network);
 	}
 	
-	scoredBacklogNetworks = scoredBacklogNetworks.sort(function(a, b) { return b.fitness - a.fitness; });
-	var cullIndex = Math.ceil(scoredBacklogNetworks.length / 2) - 1;
+	scoredOutcasts = scoredOutcasts.sort(function(a, b) { return b.fitness - a.fitness; });
 	
-	scoredBacklogNetworks = (scoredBacklogNetworks.length > 5)? scoredBacklogNetworks.splice(0, cullIndex) : scoredBacklogNetworks;
+	// Strategically cull the population of scored outcasts if it is growing excessive.
+	while(scoredOutcasts.length > 100)
+	{
+		scoredOutcasts.pop();
+	}
 	
-	self.classificationBacklog = scoredBacklogNetworks.concat(unscoredBacklogNetworks);
+	// Randomly cull the population of unscored outcasts if it is growing excessive.
+	// There actually shouldn't be any, but this is a saftey net to prevent memory leaks.
+	while(unscoredOutcasts.length > 100)
+	{
+		unscoredOutcasts.splice(num.randomInt(0, unscoredOutcasts.length - 1), 1);
+	}
 	
-	// Cull classifications that have gone stale.
-	self.classifications = self.classifications.sort(function(a, b) { return b.averageFitness - a.averageFitness; });
+	// Create a new generation for each classification, and collect any outcasts from
+	// the process.
+	var newOutcasts = [];
 	
-	for(var i = self.classifications.length - 1; i >= 0; i--)
+	for(var i = 0; i < self.classifications.length; i++)
 	{
 		var classification = self.classifications[i];
 		
-		if(classification.mutationMultiplier > 12.5 && self.classifications.length > 1)
-			self.classifications.splice(i, 1);
+		var outcasts = classification.newGeneration(self.generation);
+		
+		newOutcasts = newOutcasts.concat(outcasts);
 	}
 	
-	// If there is room, grab fittest backlogged networks to create new classifications.
-	while(self.classifications.length < 10 && self.classificationBacklog.length > 0)
+	// With any innovation preserved from the existing classifications (through the outcast process),
+	// cull the list of current classifications down to the 5 strongest.
+	self.classifications = self.classifications.sort(function(a, b) { return b.referenceNetwork.fitness - a.referenceNetwork.fitness; });
+	
+	for(var i = self.classifications.length - 1; i > 4; i--)
 	{
-		var network = self.classificationBacklog[0];
+		var classification = self.classifications[i];
+		var strongestNetwork = classification.referenceNetwork;
 		
-		self.spawnClassification(network);
+		// The strongest network from the outcast classification will survive, but be outcast.
+		if(strongestNetwork != null)
+			newOutcasts.push(strongestNetwork);
 		
-		self.classificationBacklog.splice(0, 1);
+		self.classifications.splice(i, 1);
+	}
+	
+	// Allow outcasts to return if they are compatible with any new generations.
+	// There can also be up to 10 active classifications, and we just cull all but
+	// the strongest 5... so there is room to create up to 5 new groups for the
+	// strongest outcasts.
+	for(var i = scoredOutcasts.length - 1; i >= 0; i--)
+	{
+		var network = scoredOutcasts[i];
+		var assigned = self.determineClassification(network);
+		
+		if(!assigned && self.classifications.length < 10)
+		{
+			var classification = self.spawnClassification(network);
+			
+			var outcasts = classification.newGeneration(self.generation);
+			
+			newOutcasts = newOutcasts.concat(outcasts);
+			
+			assigned = true;
+		}
+		
+		if(assigned)
+			scoredOutcasts.splice(0, 1);
+	}
+	
+	// Recombine scored & unscored outcasts, and add in new outcasts.
+	self.classificationBacklog = scoredOutcasts.concat(unscoredOutcasts).concat(newOutcasts);
+	
+	for(var i = self.classificationBacklog.length - 1; i >= 0; i--)
+	{
+		var network = self.classificationBacklog[i];
+		
+		if(network.neurons.length <= network.actuators.length && network.axions.length == 0)
+			self.classificationBacklog.splice(i, 1);
 	}
 }
 
@@ -344,7 +429,15 @@ function neurodriver_getEvaluationNetwork(terminateCurrent)
 		network = null;
 	
 	if(network == null && classification != null)
+	{
 		network = classification.nextNetwork();
+		
+		if(network != null)
+		{
+			dom.set("stats-classification", self.currentClassificationIndex + 1);
+			dom.set("stats-network", classification.nextNetworkIndex);
+		}
+	}
 	
 	// If there are no more networks in current classification,
 	// move on to the next classification.
@@ -355,7 +448,15 @@ function neurodriver_getEvaluationNetwork(terminateCurrent)
 		classification = self.classifications[self.currentClassificationIndex];
 		
 		if(classification != null)
+		{
 			network = classification.nextNetwork();
+			
+			if(network != null)
+			{
+				dom.set("stats-classification", self.currentClassificationIndex + 1);
+				dom.set("stats-network", classification.nextNetworkIndex);
+			}
+		}
 	}
 	
 	// No classified networks available? See if there are any unclassified networks in classification backlog.
@@ -370,6 +471,12 @@ function neurodriver_getEvaluationNetwork(terminateCurrent)
 				break;
 			}
 		}
+		
+		if(network != null)
+		{
+			dom.set("stats-classification", "backlog");
+			dom.set("stats-network", "n/a");
+		}
 	}
 	
 	// Still no network? Time for a new generation!
@@ -380,7 +487,15 @@ function neurodriver_getEvaluationNetwork(terminateCurrent)
 		var classification = self.classifications[self.currentClassificationIndex];
 		
 		if(classification != null)
+		{
 			network = classification.nextNetwork();
+			
+			if(network != null)
+			{
+				dom.set("stats-classification", self.currentClassificationIndex + 1);
+				dom.set("stats-network", classification.nextNetworkIndex);
+			}
+		}
 	}
 	
 	self.evaluationNetwork = network;
@@ -413,7 +528,13 @@ function neurodriver_sample()
 	
 	var network = self.getEvaluationNetwork(terminateCurrent);
 	
-	dom.set("hud-score", fitness.toLocaleString());
+	dom.set("stats-generation", "???");
+	dom.set("stats-score", "???");
+	dom.set("stats-outcasts", "???");
+	
+	dom.set("stats-generation", self.generation);
+	dom.set("stats-score", fitness.toLocaleString());
+	dom.set("stats-outcasts", self.classificationBacklog.length.toLocaleString());
 	
 	self.evaluation.lastSampleFitness = fitness;
 	self.evaluation.lastSampleDistance = game.carPos;
@@ -613,6 +734,7 @@ function neurodriver_initiate(displayCanvasId, gfxIn)
 	spawn.gfxOut = null;
 	
 	spawn.generation = 0;
+	spawn.fittestNetworks = [];
 	
 	// Manage global innovation count for all networks.
 	spawn.innovation = 0;
@@ -653,10 +775,10 @@ function neurodriver_initiate(displayCanvasId, gfxIn)
 	spawn.MUTATION_RATES = {
 		
 		MODIFY_SENSOR_POS:  0.90,
-		TWEAK_SENSOR_POS: 	0.95,
-		REPLACE_SENSOR_POS: 0.05,
+		TWEAK_SENSOR_POS: 	0.90,
+		REPLACE_SENSOR_POS: 0.10,
 		MODIFY_SENSOR_RAD: 	0.05,
-		MODIFY_SENSOR_CHN: 	0.05
+		MODIFY_SENSOR_CHN: 	0.25
 		
 	};
 	
@@ -687,22 +809,22 @@ function neurodriver_initiate(displayCanvasId, gfxIn)
 	//var tempNetwork = spawn.spawnNetwork();
 	//var tempClassification = spawn.spawnClassification(tempNetwork);
 	
-	if(neurobackup != null)
-	{
-		for(var i = 0; i < neurobackup.networks.length; i++)
-		{
-			var dummy = neurobackup.networks[i];
-			var network = spawn.spawnNetwork();
+	// if(neurobackup != null)
+	// {
+		// for(var i = 0; i < neurobackup.networks.length; i++)
+		// {
+			// var dummy = neurobackup.networks[i];
+			// var network = spawn.spawnNetwork();
 			
-			network.fitness = dummy.fitness;
-			network.sensors = dummy.sensors;
-			network.actuators = dummy.actuators;
-			network.neurons = dummy.neurons;
-			network.axions = dummy.axions;
+			// network.fitness = dummy.fitness;
+			// network.sensors = dummy.sensors;
+			// network.actuators = dummy.actuators;
+			// network.neurons = dummy.neurons;
+			// network.axions = dummy.axions;
 			
-			spawn.classificationBacklog.push(network);
-		}
-	}
+			// spawn.classificationBacklog.push(network);
+		// }
+	// }
 	
 	spawn.currentClassificationIndex = 0;
 	

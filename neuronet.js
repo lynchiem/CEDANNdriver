@@ -177,8 +177,8 @@ function neuronet_breed(partnerNetwork, childNetwork, generation)
 		var genome = {
 			origin: "partner", 
 			axion: axion, 
-			inputNeuron: self.getNeuronByLayer(axion.inputNeuronLayer), 
-			outputNeuron: self.getNeuronByLayer(axion.outputNeuronLayer)
+			inputNeuron: partnerNetwork.getNeuronByLayer(axion.inputNeuronLayer), 
+			outputNeuron: partnerNetwork.getNeuronByLayer(axion.outputNeuronLayer)
 		};
 		
 		if(partnerNetwork.fitness > self.fitness)
@@ -270,12 +270,13 @@ function neuronet_breed(partnerNetwork, childNetwork, generation)
 		
 		if(inputNeuron.sensorIndex != null || outputNeuron.sensorIndex != null)
 		{
-			for(var i = 0; i < sensorsMeta.length; i++)
+			for(var j = 0; j < sensorsMeta.length; j++)
 			{
-				var sensorMeta = sensorsMeta[i];
+				var sensorMeta = sensorsMeta[j];
 				
 				if(genome.origin == sensorMeta.origin && inputNeuron.sensorIndex == sensorMeta.oldIndex)
 					inputNeuron.sensorIndex = sensorMeta.newIndex;
+				
 				if(genome.origin == sensorMeta.origin && outputNeuron.sensorIndex == sensorMeta.oldIndex)
 					outputNeuron.sensorIndex = sensorMeta.newIndex;
 			}
@@ -284,12 +285,38 @@ function neuronet_breed(partnerNetwork, childNetwork, generation)
 		var conflictingInputNeuron = childNetwork.getNeuronByLayer(inputNeuron.layer);
 		
 		if(conflictingInputNeuron == null)
-			childNetwork.push(inputNeuron);
+			childNetwork.neurons.push(inputNeuron);
 		
 		var conflictingOutputNeuron = childNetwork.getNeuronByLayer(outputNeuron.layer);
 		
 		if(conflictingOutputNeuron == null)
-			childNetwork.push(outputNeuron);
+			childNetwork.neurons.push(outputNeuron);
+	}
+	
+	// Blackbox ("hidden") neurons can only be introduced by intersecting an axion, so any meaningful
+	// blackbox neurons will have already been copied...
+	//
+	// ...but there is a chance floating sensor neurons existed that were not copied during axion transfer.
+	for(var i = 0; i < childNetwork.sensors.length; i++)
+	{
+		var matched = false;
+		
+		for(var j = 0; j < childNetwork.neurons.length; j++)
+		{
+			var neuron = childNetwork.neurons[j];
+			
+			if(neuron.sensorIndex == i)
+			{
+				matched = true;
+				
+				break;
+			}
+		}
+		
+		if(matched)
+			continue;
+		
+		childNetwork.createNeuron(self.SPECIAL_LAYERS.SENSORS, i, null, generation);
 	}
 }
 
@@ -767,9 +794,11 @@ function neuronet_mutateNetwork(generation)
 	
 }
 
-function neuronet_initiate(newInnovationHook, newSensorHook, mutateSensorHook, compareSensorHook)
+function neuronet_initiate(originGeneration, newInnovationHook, newSensorHook, mutateSensorHook, compareSensorHook)
 {
 	var spawn = {};
+	
+	spawn.originGeneration = originGeneration;
 	
 	spawn.fitness = null;
 	
@@ -777,7 +806,6 @@ function neuronet_initiate(newInnovationHook, newSensorHook, mutateSensorHook, c
 	spawn.axions    = [];	
 	spawn.sensors   = [];
 	spawn.actuators = [];
-	
 	
 	// Register external integration hooks.
 	spawn.newInnovation = newInnovationHook;
@@ -816,23 +844,23 @@ function neuronet_initiate(newInnovationHook, newSensorHook, mutateSensorHook, c
 	
 	spawn.MUTATION_RATES = {
 		
-		NEW_AXION: 		0.15,
-		NEW_NEURON: 	0.10,
+		NEW_AXION: 		0.20,
+		NEW_NEURON: 	0.05,
 		NEW_SENSOR: 	0.25, // for new neuron
 		ALTER_AXION: 	0.80,
 		ALTER_WEIGHT: 	0.90, // for axion alteration
 		REPLACE_WEIGHT: 0.10, // for axion alteration
-		ALTER_SENSOR: 	0.50,
+		ALTER_SENSOR: 	0.60,
 		TOGGLE_AXION: 	0.00
 		
 	};
 	
 	spawn.LIMITS = {
 		
-		MAX_NEURONS:   100, 
-		MAX_SENSORS:   25, 
+		MAX_NEURONS:   20, 
+		MAX_SENSORS:   10, 
 		MAX_ACTUATORS: 5, 
-		MAX_AXIONS:    500, 
+		MAX_AXIONS:    75, 
 		DORM_GENS: 	   50   // gens an axion or neuron can be dormant before being culled
 		
 	};
