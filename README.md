@@ -16,6 +16,10 @@ The author makes no claims as to whether this combative approach provides any no
 
 Leveraging the more agressive cycle of combative neuro-evolution, CEDANN also explores allowing networks to evolve their inputs, rather than being restricted to a fixed set of pre-configured inputs. Without specific knowledge of the workings of the inputs, networks should be able to use a blackbox mechanism to request new inputs and mutate existing inputs throughout the network's evolution.
 
+The outcast & redemption system also provides an opportunity for distrubuted neuro-evolution, with a chance for strong outcasts that are not finding a chance to form a breeding group in the local assesment environment to migrate to other assesment environments.
+
 # CEDANNdriver
 
-CEDANNdriver is a Javascript implementation of CEDANN, paired with a basic psuedo-3d racing game (based on tutorials by "Code inComplete". Using a blackbox mechanism that provides basic RGB sensors, and a fitness model based on distance & ideal lap time, CEDANN will attempt to learn to complete the racing course using only visual inputs.
+CEDANNdriver is a Javascript implementation of CEDANN, paired with a basic psuedo-3d racing game, reminiscient of early arcade racing games. Using a blackbox mechanism that provides basic RGB sensors, and a fitness model based on distance & ideal lap time, CEDANN will attempt to learn to complete the racing course using only visual inputs.
+
+The racing game it self is based on tutorials by "Code inComplete", and was chosen because it offers a fairly straight forward objective, while still presenting a number of challenges (namely visual input & non-trivial evaluation times). 
