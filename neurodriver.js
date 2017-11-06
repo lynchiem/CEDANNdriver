@@ -400,6 +400,15 @@ function neurodriver_newGeneration()
 			scoredOutcasts.splice(0, 1);
 	}
 	
+	// Mutate any scored outcasts that didn't find a home this generation.
+	// This gives them a chance to prove wether their innovation is worthwhile.
+	for(var i = 0; i < scoredOutcasts.length; i++)
+	{
+		var network = scoredOutcasts[i];
+		
+		network.mutateNetwork(self.generation);
+	}
+	
 	// Recombine scored & unscored outcasts, and add in new outcasts.
 	self.classificationBacklog = scoredOutcasts.concat(unscoredOutcasts).concat(newOutcasts);
 	
